@@ -5,7 +5,6 @@ package websocket
 import (
 	"compress/flate"
 	"io"
-	"net/http"
 	"sync"
 )
 
@@ -58,7 +57,7 @@ type compressionOptions struct {
 	serverNoContextTakeover bool
 }
 
-func (copts *compressionOptions) setHeader(h http.Header) {
+func (copts *compressionOptions) String() string {
 	s := "permessage-deflate"
 	if copts.clientNoContextTakeover {
 		s += "; client_no_context_takeover"
@@ -66,7 +65,7 @@ func (copts *compressionOptions) setHeader(h http.Header) {
 	if copts.serverNoContextTakeover {
 		s += "; server_no_context_takeover"
 	}
-	h.Set("Sec-WebSocket-Extensions", s)
+	return s
 }
 
 // These bytes are required to get flate.Reader to return.
