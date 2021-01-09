@@ -34,7 +34,7 @@ type DialOptions struct {
 	Subprotocols []string
 
 	// CompressionMode controls the compression mode.
-	// Defaults to CompressionNoContextTakeover.
+	// Defaults to CompressionDisabled.
 	//
 	// See docs on CompressionMode for details.
 	CompressionMode CompressionMode
@@ -44,6 +44,29 @@ type DialOptions struct {
 	// Defaults to 512 bytes for CompressionNoContextTakeover and 128 bytes
 	// for CompressionContextTakeover.
 	CompressionThreshold int
+}
+
+func (opts *DialOptions) cloneWithDefaults(ctx context.Context) (context.Context, context.CancelFunc, *DialOptions) {
+	var cancel context.CancelFunc
+
+	var o DialOptions
+	if opts != nil {
+		o = *opts
+	}
+	if o.HTTPClient == nil {
+		o.HTTPClient = http.DefaultClient
+	} else if opts.HTTPClient.Timeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, opts.HTTPClient.Timeout)
+
+		newClient := *opts.HTTPClient
+		newClient.Timeout = 0
+		opts.HTTPClient = &newClient
+	}
+	if o.HTTPHeader == nil {
+		o.HTTPHeader = http.Header{}
+	}
+
+	return ctx, cancel, &o
 }
 
 // Dial performs a WebSocket handshake on url.
@@ -66,26 +89,10 @@ func Dial(ctx context.Context, u string, opts *DialOptions) (*Conn, *http.Respon
 func dial(ctx context.Context, urls string, opts *DialOptions, rand io.Reader) (_ *Conn, _ *http.Response, err error) {
 	defer errd.Wrap(&err, "failed to WebSocket dial")
 
-	if opts == nil {
-		opts = &DialOptions{}
-	}
-
-	opts = &*opts
-	if opts.HTTPClient == nil {
-		opts.HTTPClient = http.DefaultClient
-	} else if opts.HTTPClient.Timeout > 0 {
-		var cancel context.CancelFunc
-
-		ctx, cancel = context.WithTimeout(ctx, opts.HTTPClient.Timeout)
+	var cancel context.CancelFunc
+	ctx, cancel, opts = opts.cloneWithDefaults(ctx)
+	if cancel != nil {
 		defer cancel()
-
-		newClient := *opts.HTTPClient
-		newClient.Timeout = 0
-		opts.HTTPClient = &newClient
-	}
-
-	if opts.HTTPHeader == nil {
-		opts.HTTPHeader = http.Header{}
 	}
 
 	secWebSocketKey, err := secWebSocketKey(rand)
@@ -243,7 +250,8 @@ func verifyServerExtensions(copts *compressionOptions, h http.Header) (*compress
 		return nil, fmt.Errorf("WebSocket protcol violation: unsupported extensions from server: %+v", exts[1:])
 	}
 
-	copts = &*copts
+	_copts := *copts
+	copts = &_copts
 
 	for _, p := range ext.params {
 		switch p {

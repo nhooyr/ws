@@ -39,7 +39,23 @@ func TestAccept(t *testing.T) {
 		r.Header.Set("Origin", "harhar.com")
 
 		_, err := Accept(w, r, nil)
-		assert.Contains(t, err, `request Origin "harhar.com" is not authorized for Host`)
+		assert.Contains(t, err, `request Origin "harhar.com" is not a valid URL with a host`)
+	})
+
+	// #247
+	t.Run("unauthorizedOriginErrorMessage", func(t *testing.T) {
+		t.Parallel()
+
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/", nil)
+		r.Header.Set("Connection", "Upgrade")
+		r.Header.Set("Upgrade", "websocket")
+		r.Header.Set("Sec-WebSocket-Version", "13")
+		r.Header.Set("Sec-WebSocket-Key", "meow123")
+		r.Header.Set("Origin", "https://harhar.com")
+
+		_, err := Accept(w, r, nil)
+		assert.Contains(t, err, `request Origin "harhar.com" is not authorized for Host "example.com"`)
 	})
 
 	t.Run("badCompression", func(t *testing.T) {
@@ -55,7 +71,9 @@ func TestAccept(t *testing.T) {
 		r.Header.Set("Sec-WebSocket-Key", "meow123")
 		r.Header.Set("Sec-WebSocket-Extensions", "permessage-deflate; harharhar")
 
-		_, err := Accept(w, r, nil)
+		_, err := Accept(w, r, &AcceptOptions{
+			CompressionMode: CompressionContextTakeover,
+		})
 		assert.Contains(t, err, `unsupported permessage-deflate parameter`)
 	})
 

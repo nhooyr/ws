@@ -51,7 +51,7 @@ type AcceptOptions struct {
 	OriginPatterns []string
 
 	// CompressionMode controls the compression mode.
-	// Defaults to CompressionNoContextTakeover.
+	// Defaults to CompressionDisabled.
 	//
 	// See docs on CompressionMode for details.
 	CompressionMode CompressionMode
@@ -61,6 +61,14 @@ type AcceptOptions struct {
 	// Defaults to 512 bytes for CompressionNoContextTakeover and 128 bytes
 	// for CompressionContextTakeover.
 	CompressionThreshold int
+}
+
+func (opts *AcceptOptions) cloneWithDefaults() *AcceptOptions {
+	var o AcceptOptions
+	if opts != nil {
+		o = *opts
+	}
+	return &o
 }
 
 // Accept accepts a WebSocket handshake from a client and upgrades the
@@ -77,17 +85,13 @@ func Accept(w http.ResponseWriter, r *http.Request, opts *AcceptOptions) (*Conn,
 func accept(w http.ResponseWriter, r *http.Request, opts *AcceptOptions) (_ *Conn, err error) {
 	defer errd.Wrap(&err, "failed to accept WebSocket connection")
 
-	if opts == nil {
-		opts = &AcceptOptions{}
-	}
-	opts = &*opts
-
 	errCode, err := verifyClientRequest(w, r)
 	if err != nil {
 		http.Error(w, err.Error(), errCode)
 		return nil, err
 	}
 
+	opts = opts.cloneWithDefaults()
 	if !opts.InsecureSkipVerify {
 		err = authenticateOrigin(r, opts.OriginPatterns)
 		if err != nil {
@@ -211,7 +215,10 @@ func authenticateOrigin(r *http.Request, originHosts []string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("request Origin %q is not authorized for Host %q", origin, r.Host)
+	if u.Host == "" {
+		return fmt.Errorf("request Origin %q is not a valid URL with a host", origin)
+	}
+	return fmt.Errorf("request Origin %q is not authorized for Host %q", u.Host, r.Host)
 }
 
 func match(pattern, s string) (bool, error) {
