@@ -33,7 +33,7 @@ import (
 // reading/writing goroutines are interrupted but the connection is kept alive.
 //
 // The Addr methods will return a mock net.Addr that returns "websocket" for Network
-// and "websocket/unknown-addr" for String.
+// and "websocket/unknown-addr" for String when RemoteAddr and LocalAddr methods do not exist.
 //
 // A received StatusNormalClosure or StatusGoingAway close frame will be translated to
 // io.EOF when reading.
@@ -131,14 +131,6 @@ func (a websocketAddr) Network() string {
 
 func (a websocketAddr) String() string {
 	return "websocket/unknown-addr"
-}
-
-func (c *netConn) RemoteAddr() net.Addr {
-	return websocketAddr{}
-}
-
-func (c *netConn) LocalAddr() net.Addr {
-	return websocketAddr{}
 }
 
 func (c *netConn) SetDeadline(t time.Time) error {
