@@ -7,7 +7,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -53,14 +52,14 @@ type msgWriter struct {
 
 func (mw *msgWriter) Write(p []byte) (int, error) {
 	if mw.closed {
-		return 0, errors.New("cannot use closed writer")
+		return 0, errClosed
 	}
 	return mw.mw.Write(p)
 }
 
 func (mw *msgWriter) Close() error {
 	if mw.closed {
-		return errors.New("cannot use closed writer")
+		return errClosed
 	}
 	mw.closed = true
 	return mw.mw.Close()
